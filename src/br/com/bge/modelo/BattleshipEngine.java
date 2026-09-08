@@ -55,5 +55,9 @@ public class BattleshipEngine {
 		return tabuleiro != null ? tabuleiro.getTotalColunas() : Tabuleiro.COLUNAS_PADRAO;
 	}
 	
+	public int getNaviosRestantes() {
+	    return tabuleiro != null ? tabuleiro.contarNaviosRestantes() : 0;
+	}
+	
 	
 }

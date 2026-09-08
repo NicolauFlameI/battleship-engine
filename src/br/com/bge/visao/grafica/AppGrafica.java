@@ -1,177 +1,260 @@
 package br.com.bge.visao.grafica;
 
-// Importacoes do JavaFX para gerenciamento do ciclo de vida da aplicacao.
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-// Importacoes dos componentes de controle visual (botoes, textos e caixas de alerta).
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-// Importacoes dos paineis de layout para organizacao espacial dos elementos.
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-// Importacoes do nosso motor desacoplado (reaproveitamento direto da Engine sem alteracoes).
+import br.com.bge.ia.DificuldadeBot;
+import br.com.bge.ia.EstrategiaBot;
+import br.com.bge.ia.FabricaBot;
 import br.com.bge.modelo.BattleshipEngine;
+import br.com.bge.modelo.Posicao;
 import br.com.bge.modelo.ResultadoTiro;
 
 public class AppGrafica extends Application {
 
-    // Constante para definir o tamanho fixo de cada celula da grade em pixels.
-    private static final int TAMANHO_BOTAO = 45;
+    private static final int TAMANHO_CELULA = 42;
 
-    // Referencia para o motor de regras de negocio.
-    private BattleshipEngine engine;
+    private Stage palco;
+    private BattleshipEngine engineJogador;
+    private BattleshipEngine engineBot;
     
-    // Matriz de componentes visuais para manipular os botoes da tela individualmente.
-    private Button[][] botoesGrade;
-    
-    // Elementos de texto na interface para exibir status e mensagens em tempo real.
+    private EstrategiaBot bot;
+    private DificuldadeBot dificuldadeSelecionada;
+    private ResultadoTiro ultimoResultadoBot;
+
+    private Button[][] botoesRadarInimigo;
+    private Label[][] celulasDefesaJogador;
+
     private Label rotuloStatus;
-    private Label rotuloNaviosRestantes;
+    private Label rotuloPlacar;
 
     @Override
     public void start(Stage palcoPrincipal) {
-        // Inicializa a engine e prepara o tabuleiro 8x8 na memoria.
-        this.engine = new BattleshipEngine();
-        this.botoesGrade = new Button[8][8];
+        this.palco = palcoPrincipal;
+        this.palco.setTitle("BGE - Batalha Naval Tática");
+        this.palco.setResizable(false);
 
-        // Painel Raiz (Root Node) usando BorderPane: divide a tela em Topo, Centro, Rodape, etc.
-        BorderPane painelRaiz = new BorderPane();
-        painelRaiz.setPadding(new Insets(15)); // Margem interna de 15 pixels nas bordas da janela.
-
-        // 1. REGIAO SUPERIOR (TOPO): Painel vertical (VBox) com titulos e informacoes da partida.
-        VBox painelCabecalho = new VBox(8); // Espacamento vertical de 8 pixels entre os textos.
-        painelCabecalho.setAlignment(Pos.CENTER);
-
-        Label rotuloTitulo = new Label("BATTLESHIP GAME ENGINE");
-        rotuloTitulo.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #0f172a;");
-
-        rotuloStatus = new Label("Clique em uma coordenada para disparar!");
-        rotuloStatus.setStyle("-fx-font-size: 14px; -fx-text-fill: #334155;");
-
-        rotuloNaviosRestantes = new Label("Navios inimigos restantes: 3");
-        rotuloNaviosRestantes.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2563eb;");
-
-        painelCabecalho.getChildren().addAll(rotuloTitulo, rotuloStatus, rotuloNaviosRestantes);
-        painelRaiz.setTop(painelCabecalho);
-
-        // 2. REGIAO CENTRAL: GridPane com a matriz 8x8 de botoes que simula a agua do mar.
-        GridPane gradeVisual = construirGradeBotoes();
-        painelRaiz.setCenter(gradeVisual);
-
-        // 3. REGIAO INFERIOR: Botao de controle para reiniciar o jogo a qualquer momento.
-        Button botaoReiniciar = new Button("Nova Partida");
-        botaoReiniciar.setStyle("-fx-font-size: 13px; -fx-padding: 8 16; -fx-cursor: hand;");
-        
-        // Expressao Lambda (Java 8+): Metodologia de escuta de eventos (Event-Driven).
-        // Quando o usuario clica no botao reiniciar, executamos o metodo reiniciarPartida().
-        botaoReiniciar.setOnAction(evento -> reiniciarPartida());
-
-        VBox painelRodape = new VBox(botaoReiniciar);
-        painelRodape.setAlignment(Pos.CENTER);
-        painelRodape.setPadding(new Insets(10, 0, 0, 0));
-        painelRaiz.setBottom(painelRodape);
-
-        // Comeca a primeira partida limpando e sorteando os navios na Engine.
-        reiniciarPartida();
-
-        // Configuracao da Cena e exibicao da Janela fisica.
-        Scene cena = new Scene(painelRaiz, 480, 560);
-        palcoPrincipal.setTitle("BGE - Batalha Naval Interativa");
-        palcoPrincipal.setResizable(false); // Trava o redimensionamento para manter o layout estavel.
-        palcoPrincipal.setScene(cena);
-        palcoPrincipal.show();
+        exibirTelaMenu();
+        this.palco.show();
     }
 
-    // Cria a estrutura visual da grade com botoes interativos.
-    // Metodologia: GridPane com espacamento uniforme (gap).
-    private GridPane construirGradeBotoes() {
+    private void exibirTelaMenu() {
+        VBox layoutMenu = new VBox(22);
+        layoutMenu.setAlignment(Pos.CENTER);
+        layoutMenu.setPadding(new Insets(40));
+        layoutMenu.setStyle("-fx-background-color: #0b192c;");
+
+        Label icone = new Label("⚓ 🚢 ⚓");
+        icone.setStyle("-fx-font-size: 32px;");
+
+        Label titulo = new Label("BATTLESHIP ENGINE");
+        titulo.setStyle("-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #38bdf8; -fx-letter-spacing: 2px;");
+
+        Label subtitulo = new Label("Selecione a Dificuldade da Frota Inimiga:");
+        subtitulo.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #e2e8f0;");
+        
+        ComboBox<DificuldadeBot> comboDificuldade = new ComboBox<>();
+        comboDificuldade.getItems().addAll(DificuldadeBot.FACIL, DificuldadeBot.MEDIO, DificuldadeBot.DIFICIL);
+        comboDificuldade.setValue(DificuldadeBot.MEDIO);
+     // Estilização com texto preto e fundo claro dentro do combo para não ocultar opções
+        comboDificuldade.setStyle("-fx-font-size: 13px; -fx-background-color: #f1f5f9; -fx-font-weight: bold;");
+        
+        Button botaoIniciar = new Button("INICIAR BATALHA");
+        botaoIniciar.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-background-color: #0284c7; -fx-text-fill: white; -fx-padding: 12 28; -fx-cursor: hand; -fx-background-radius: 6;");
+
+        botaoIniciar.setOnAction(e -> {
+            this.dificuldadeSelecionada = comboDificuldade.getValue();
+            this.bot = FabricaBot.criarBot(this.dificuldadeSelecionada);
+            iniciarPartidaVersus();
+        });
+
+        layoutMenu.getChildren().addAll(icone, titulo, subtitulo, comboDificuldade, botaoIniciar);
+
+        Scene cenaMenu = new Scene(layoutMenu, 520, 380);
+        palco.setScene(cenaMenu);
+    }
+
+    private void iniciarPartidaVersus() {
+        this.engineJogador = new BattleshipEngine();
+        this.engineBot = new BattleshipEngine();
+
+        this.engineJogador.startGame();
+        this.engineBot.startGame();
+
+        this.ultimoResultadoBot = null;
+        this.botoesRadarInimigo = new Button[8][8];
+        this.celulasDefesaJogador = new Label[8][8];
+
+        BorderPane raizJogo = new BorderPane();
+        raizJogo.setPadding(new Insets(16));
+        raizJogo.setStyle("-fx-background-color: #081220;");
+
+        // Painel Superior: Placar e Logs
+        VBox painelTopo = new VBox(6);
+        painelTopo.setAlignment(Pos.CENTER);
+
+        Label rotuloModo = new Label("RADAR TÁTICO — IA: " + dificuldadeSelecionada.name());
+        rotuloModo.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
+
+        rotuloStatus = new Label("Sua vez! Selecione uma coordenada no radar inimigo.");
+        // Texto em branco puro com peso médio para leitura nítida sobre o azul escuro
+        rotuloStatus.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
+
+        rotuloPlacar = new Label("Navios Inimigos: " + engineBot.getNaviosRestantes() + " | Seus Navios: " + engineJogador.getNaviosRestantes());
+        // Verde esmeralda brilhante para contraste com o preto/azul
+        rotuloPlacar.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #4ade80;");
+        
+        painelTopo.getChildren().addAll(rotuloModo, rotuloStatus, rotuloPlacar);
+        raizJogo.setTop(painelTopo);
+
+        // Painel Central: Tabuleiros
+        HBox painelTabuleiros = new HBox(36);
+        painelTabuleiros.setAlignment(Pos.CENTER);
+        painelTabuleiros.setPadding(new Insets(16, 0, 16, 0));
+
+        Label tituloDefesa = new Label("🛡️ SUA FROTA (Defesa)");
+        tituloDefesa.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #60a5fa;");
+        VBox secaoDefesa = new VBox(8, tituloDefesa, criarGradeDefesaJogador());
+        secaoDefesa.setAlignment(Pos.CENTER);
+
+        Label tituloAtaque = new Label("🎯 RADAR DE DISPARO (Ataque)");
+        tituloAtaque.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #f87171;");
+        VBox secaoAtaque = new VBox(8, tituloAtaque, criarGradeRadarInimigo());
+        secaoAtaque.setAlignment(Pos.CENTER);
+
+        painelTabuleiros.getChildren().addAll(secaoDefesa, secaoAtaque);
+        raizJogo.setCenter(painelTabuleiros);
+
+        // Painel Inferior
+        Button botaoMenu = new Button("Abandonar / Menu");
+        botaoMenu.setOnAction(e -> exibirTelaMenu());
+        botaoMenu.setStyle("-fx-background-color: #334155; -fx-text-fill: #f8fafc; -fx-cursor: hand; -fx-padding: 8 16; -fx-background-radius: 4;");
+
+        VBox painelBase = new VBox(botaoMenu);
+        painelBase.setAlignment(Pos.CENTER);
+        raizJogo.setBottom(painelBase);
+
+        Scene cenaJogo = new Scene(raizJogo, 860, 560);
+        palco.setScene(cenaJogo);
+    }
+
+    private GridPane criarGradeRadarInimigo() {
         GridPane grade = new GridPane();
         grade.setAlignment(Pos.CENTER);
-        grade.setHgap(4); // Espaco horizontal de 4 pixels entre cada botao.
-        grade.setVgap(4); // Espaco vertical de 4 pixels entre cada botao.
-        grade.setPadding(new Insets(15, 0, 15, 0));
+        grade.setHgap(4);
+        grade.setVgap(4);
 
         for (int l = 0; l < 8; l++) {
             for (int c = 0; c < 8; c++) {
-                Button botao = new Button();
-                botao.setPrefSize(TAMANHO_BOTAO, TAMANHO_BOTAO);
-                
-                // Variaveis finais obrigatorias para uso dentro da expressao Lambda (escopo de closure).
-                final int linhaAtual = l;
-                final int colunaAtual = c;
+                Button btn = new Button();
+                btn.setPrefSize(TAMANHO_CELULA, TAMANHO_CELULA);
+                btn.setStyle("-fx-background-color: #0369a1; -fx-border-color: #0284c7; -fx-border-radius: 4; -fx-background-radius: 4; -fx-cursor: hand;");
 
-                // Atribui o ouvinte de clique (Event Handler) em cada botao da matriz.
-                botao.setOnAction(e -> executarTiro(linhaAtual, colunaAtual));
+                final int linha = l;
+                final int coluna = c;
+                btn.setOnAction(e -> processarTurnoCompleto(linha, coluna));
 
-                botoesGrade[l][c] = botao;
-                // Adiciona o botao no painel: parametro (coluna, linha) no padrao do JavaFX.
-                grade.add(botao, c, l);
+                botoesRadarInimigo[l][c] = btn;
+                grade.add(btn, c, l);
             }
         }
         return grade;
     }
 
-    // Processa a acao de disparo quando o usuario clica em uma celula do mar.
-    private void executarTiro(int linha, int coluna) {
-        // Invoca a Engine para calcular a regra do tiro e receber o pacote de diagnostico (DTO).
-        ResultadoTiro resultado = engine.shoot(linha, coluna);
-        Button botaoClicado = botoesGrade[linha][coluna];
+    private GridPane criarGradeDefesaJogador() {
+        GridPane grade = new GridPane();
+        grade.setAlignment(Pos.CENTER);
+        grade.setHgap(4);
+        grade.setVgap(4);
 
-        // Desativa o botao para impedir que o usuario clique duas vezes na mesma celula.
-        botaoClicado.setDisable(true);
-
-        // Atualiza a apresentacao visual com base no diagnostico da Engine.
-        if (resultado.isAcertou()) {
-            botaoClicado.setText("X");
-            // Vermelho para impacto confirmado em navio.
-            botaoClicado.setStyle("-fx-background-color: #dc2626; -fx-text-fill: white; -fx-font-weight: bold; -fx-opacity: 1.0;");
-        } else {
-            botaoClicado.setText("O");
-            // Cinza escuro para tiro perdido na agua.
-            botaoClicado.setStyle("-fx-background-color: #94a3b8; -fx-text-fill: white; -fx-font-weight: bold; -fx-opacity: 1.0;");
-        }
-
-        // Atualiza os textos do cabecalho com as informacoes do turno.
-        rotuloStatus.setText(resultado.getMensagem());
-        rotuloNaviosRestantes.setText("Navios inimigos restantes: " + resultado.getNaviosRestantes());
-
-        // Metodologia: Dialogo Modal (Alert) para condicao de vitoria.
-        if (engine.isVitoria()) {
-            exibirAlertaVitoria();
-        }
-    }
-
-    // Reinicia os dados da Engine e restaura a aparencia grafica de todos os botoes.
-    private void reiniciarPartida() {
-        engine.startGame();
-
-        rotuloStatus.setText("Nova partida iniciada! Fogo a vontade.");
-        rotuloNaviosRestantes.setText("Navios inimigos restantes: 3");
-
-        // Reseta todos os botoes da tela para o estilo padrao de agua.
         for (int l = 0; l < 8; l++) {
             for (int c = 0; c < 8; c++) {
-                Button btn = botoesGrade[l][c];
-                btn.setText("");
-                btn.setDisable(false);
-                // Azul marinho suave representando o oceano inexplorado.
-                btn.setStyle("-fx-background-color: #38bdf8; -fx-cursor: hand;");
+                Label celula = new Label();
+                celula.setPrefSize(TAMANHO_CELULA, TAMANHO_CELULA);
+                celula.setAlignment(Pos.CENTER);
+                celula.setStyle("-fx-background-color: #0f172a; -fx-border-color: #1e293b; -fx-border-radius: 4;");
+
+                celulasDefesaJogador[l][c] = celula;
+                grade.add(celula, c, l);
             }
+        }
+        return grade;
+    }
+
+    private void processarTurnoCompleto(int linha, int coluna) {
+        // 1. TIRO DO JOGADOR
+        ResultadoTiro resultadoJogador = engineBot.shoot(linha, coluna);
+        Button btnClicado = botoesRadarInimigo[linha][coluna];
+        btnClicado.setDisable(true);
+
+        if (resultadoJogador.isAcertou()) {
+            btnClicado.setText("💥");
+            btnClicado.setStyle("-fx-background-color: #991b1b; -fx-border-color: #ef4444; -fx-font-size: 16px; -fx-opacity: 1.0; -fx-background-radius: 4;");
+        } else {
+            btnClicado.setText("🌊");
+            btnClicado.setStyle("-fx-background-color: #1e293b; -fx-border-color: #475569; -fx-font-size: 15px; -fx-opacity: 1.0; -fx-background-radius: 4;");
+        }
+
+        atualizarPlacar();
+
+        if (engineBot.isVitoria()) {
+            finalizarPartida(true);
+            return;
+        }
+
+        // 2. TIRO DO BOT
+        Posicao tiroBot = bot.escolherProximoTiro(engineJogador.getGradeAtual(), ultimoResultadoBot);
+        this.ultimoResultadoBot = engineJogador.shoot(tiroBot.getLinha(), tiroBot.getColuna());
+
+        Label celulaAtingida = celulasDefesaJogador[tiroBot.getLinha()][tiroBot.getColuna()];
+        if (ultimoResultadoBot.isAcertou()) {
+            celulaAtingida.setText("💥");
+            celulaAtingida.setStyle("-fx-background-color: #7f1d1d; -fx-border-color: #dc2626; -fx-font-size: 16px;");
+        } else {
+            celulaAtingida.setText("🌊");
+            celulaAtingida.setStyle("-fx-background-color: #1e293b; -fx-border-color: #334155; -fx-font-size: 15px;");
+        }
+
+        rotuloStatus.setText("Você atacou (" + linha + "," + coluna + "). A IA disparou em (" + tiroBot.getLinha() + "," + tiroBot.getColuna() + ")!");
+        atualizarPlacar();
+
+        if (engineJogador.isVitoria()) {
+            finalizarPartida(false);
         }
     }
 
-    // Exibe uma janela de alerta (pop-up) notificando o fim de jogo.
-    private void exibirAlertaVitoria() {
+    private void atualizarPlacar() {
+        rotuloPlacar.setText("Navios Inimigos: " + engineBot.getNaviosRestantes() + " | Seus Navios: " + engineJogador.getNaviosRestantes());
+    }
+
+    private void finalizarPartida(boolean vitoriaJogador) {
+        for (int l = 0; l < 8; l++) {
+            for (int c = 0; c < 8; c++) {
+                botoesRadarInimigo[l][c].setDisable(true);
+            }
+        }
+
         Alert alerta = new Alert(Alert.AlertType.INFORMATION);
-        alerta.setTitle("Vitoria Naval!");
-        alerta.setHeaderText("Parabens, Almirante!");
-        alerta.setContentText("Toda a frota inimiga foi ao fundo!");
+        if (vitoriaJogador) {
+            alerta.setTitle("Vitória Naval!");
+            alerta.setHeaderText("Almirante, a frota inimiga sucumbiu!");
+            alerta.setContentText("Todos os navios da IA foram afundados.");
+        } else {
+            alerta.setTitle("Derrota!");
+            alerta.setHeaderText("Sua frota foi destruída!");
+            alerta.setContentText("A IA eliminou todas as suas embarcações.");
+        }
         alerta.showAndWait();
     }
 
