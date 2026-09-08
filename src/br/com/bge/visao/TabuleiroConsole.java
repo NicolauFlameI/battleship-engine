@@ -1,97 +1,160 @@
 package br.com.bge.visao;
 
-// Importa a Facade e o DTO do nosso pacote de modelo/regra de negocio.
-// Metodologia: Desacoplamento. A camada visual so conhece a Fachada e o Objeto de Transferencia.
+// Importa os componentes da IA e o Padrao Factory.
+import br.com.bge.ia.DificuldadeBot;
+import br.com.bge.ia.EstrategiaBot;
+import br.com.bge.ia.FabricaBot;
+
+// Importa o dominio da Engine desacoplada.
 import br.com.bge.modelo.BattleshipEngine;
+import br.com.bge.modelo.Posicao;
 import br.com.bge.modelo.ResultadoTiro;
 
-// Importa ferramentas padrao para leitura de teclado e tratamento de excecoes de entrada.
+// Importa utilitarios padrao.
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class TabuleiroConsole {
 
-    // Scanner unico compartilhado para todo o ciclo de vida da interface de texto.
     private final Scanner teclado;
     
-    // Referencia para o motor desacoplado do jogo.
-    private final BattleshipEngine engine;
+    // Instancia duas engines isoladas para manter o estado independente de cada competidor.
+    // Metodologia: Desacoplamento e Reutilizacao de Componentes.
+    private BattleshipEngine engineJogador;
+    private BattleshipEngine engineBot;
 
-    // Construtor: Inicializa a conexao com o teclado e a engine de regras.
+    // Construtor: Inicializa a comunicacao com o teclado.
     public TabuleiroConsole() {
         this.teclado = new Scanner(System.in);
-        this.engine = new BattleshipEngine();
     }
 
-    // Ponto de entrada padrao da JVM para rodar o aplicativo.
     public static void main(String[] args) {
         TabuleiroConsole app = new TabuleiroConsole();
         app.executarLoopPrincipal();
     }
 
-    // Metodologia: Game Loop (Laco Principal de Jogo).
-    // Gerencia o fluxo completo: iniciar partida, turnos de disparos e opcao de revanche.
+    // Gerencia o fluxo geral: apresentacao, escolha de dificuldade e partidas.
     public void executarLoopPrincipal() {
         boolean continuarJogando = true;
 
-        System.out.println("=========================================");
-        System.out.println("       BATTLESHIP GAME ENGINE (BGE)      ");
-        System.out.println("=========================================");
+        System.out.println("=================================================");
+        System.out.println("      BATTLESHIP GAME ENGINE - MODO VERSUS BOT   ");
+        System.out.println("=================================================");
 
         while (continuarJogando) {
-            jogarPartida();
+            DificuldadeBot dificuldade = selecionarDificuldade();
+            EstrategiaBot bot = FabricaBot.criarBot(dificuldade);
 
-            // Requisito da especificacao: perguntar se o jogador deseja jogar novamente ao final.
+            jogarPartidaVersus(bot, dificuldade);
+
             continuarJogando = perguntarRevanche();
         }
 
-        System.out.println("\nObrigado por jogar BGE! Encerrando sessao.");
-        this.teclado.close(); // Fecha o fluxo de I/O para evitar vazamento de recursos (Resource Leak).
+        System.out.println("\nObrigado por jogar! Encerrando sessao.");
+        this.teclado.close();
     }
 
-    // Controla uma partida individual do inicio ate a condicao de vitoria.
-    private void jogarPartida() {
-        // Inicializa o motor e recebe a grade limpa de 8x8.
-        engine.startGame();
-        System.out.println("\nNova partida iniciada! Navios posicionados em segredo.");
+    // Menu interativo para selecao polimorfica de dificuldade.
+    private DificuldadeBot selecionarDificuldade() {
+        System.out.println("\nSelecione o nivel de dificuldade da IA:");
+        System.out.println("1 - " + DificuldadeBot.FACIL.getDescricao());
+        System.out.println("2 - " + DificuldadeBot.MEDIO.getDescricao());
+        System.out.println("3 - " + DificuldadeBot.DIFICIL.getDescricao());
 
-        // O loop roda enquanto a engine indicar que o jogo esta em andamento.
-        while (engine.isJogoEmAndamento()) {
-            // 1. Renderiza a grade atualizada na tela.
-            renderizarTabuleiro(engine.getGradeAtual());
-
-            // 2. Leitura com validacao defensiva das coordenadas de linha e coluna.
-            int linha = lerCoordenada("Informe a LINHA (0 a " + (engine.getLinhas() - 1) + "): ", engine.getLinhas());
-            int coluna = lerCoordenada("Informe a COLUNA (0 a " + (engine.getColunas() - 1) + "): ", engine.getColunas());
-
-            // 3. Invoca a acao no motor de regras e recebe o pacote de diagnostico (DTO).
-            ResultadoTiro resultado = engine.shoot(linha, coluna);
-
-            // 4. Apresenta o feedback textual imediato do tiro.
-            System.out.println("\n>>> [RESULTADO]: " + resultado.getMensagem());
-            System.out.println(">>> [FROTA]: Embarcacoes restantes na agua: " + resultado.getNaviosRestantes());
-            System.out.println("-----------------------------------------");
+        int opcao = 0;
+        while (opcao < 1 || opcao > 3) {
+            System.out.print("Escolha uma opcao (1-3): ");
+            try {
+                opcao = teclado.nextInt();
+                if (opcao < 1 || opcao > 3) {
+                    System.out.println("Opcao invalida! Digite 1, 2 ou 3.");
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("Entrada invalida! Por favor, digite um numero.");
+                teclado.nextLine();
+            }
         }
 
-        // Se saiu do loop com vitoria, renderiza o tabuleiro final e a mensagem de felicitacoes.
-        if (engine.isVitoria()) {
-            renderizarTabuleiro(engine.getGradeAtual());
-            System.out.println("\n***************************************************");
-            System.out.println(" PARABENS, ALMIRANTE! TODA A FROTA INIMIGA AFUNDOU! ");
-            System.out.println("***************************************************");
-        }
+        return switch (opcao) {
+            case 1 -> DificuldadeBot.FACIL;
+            case 2 -> DificuldadeBot.MEDIO;
+            case 3 -> DificuldadeBot.DIFICIL;
+            default -> DificuldadeBot.FACIL;
+        };
     }
 
-    // Formata a matriz bidimensional em uma grade alfanumerica limpa e legivel.
+    // Game Loop do combate em turnos entre Humano e Maquina.
+    private void jogarPartidaVersus(EstrategiaBot bot, DificuldadeBot dificuldade) {
+        this.engineJogador = new BattleshipEngine();
+        this.engineBot = new BattleshipEngine();
+
+        engineJogador.startGame();
+        engineBot.startGame();
+
+        ResultadoTiro ultimoResultadoBot = null;
+        boolean turnoJogador = true;
+
+        System.out.println("\nPartida iniciada contra IA [" + dificuldade.name() + "]!");
+
+        // Loop enquanto ambos os jogadores possuirem navios ativos.
+        while (engineJogador.isJogoEmAndamento() && engineBot.isJogoEmAndamento()) {
+            
+            if (turnoJogador) {
+                System.out.println("\n-----------------------------------------");
+                System.out.println("           SEU TURNO DE DISPARO          ");
+                System.out.println("-----------------------------------------");
+                
+                // Mostra o radar com os tiros dados na frota do Bot.
+                System.out.println("RADAR DO INIMIGO (Seus Tiros):");
+                renderizarTabuleiro(engineBot.getGradeAtual());
+
+                int linha = lerCoordenada("Informe a LINHA (0 a " + (engineBot.getLinhas() - 1) + "): ", engineBot.getLinhas());
+                int coluna = lerCoordenada("Informe a COLUNA (0 a " + (engineBot.getColunas() - 1) + "): ", engineBot.getColunas());
+
+                ResultadoTiro res = engineBot.shoot(linha, coluna);
+                System.out.println("\n>>> [VOCE]: " + res.getMensagem());
+                System.out.println(">>> [FROTA INIMIGA]: Embarcacoes restantes: " + res.getNaviosRestantes());
+
+                turnoJogador = false; // Passa o turno para a maquina.
+            } else {
+                System.out.println("\n-----------------------------------------");
+                System.out.println("            TURNO DA MAQUINA             ");
+                System.out.println("-----------------------------------------");
+
+                // Metodologia: Polimorfismo. Invoca o algoritmo da IA sem saber qual classe concreta esta rodando.
+                Posicao tiroBot = bot.escolherProximoTiro(engineJogador.getGradeAtual(), ultimoResultadoBot);
+                
+                ultimoResultadoBot = engineJogador.shoot(tiroBot.getLinha(), tiroBot.getColuna());
+                
+                System.out.println(">>> [BOT DISPAROU EM]: (" + tiroBot.getLinha() + ", " + tiroBot.getColuna() + ")");
+                System.out.println(">>> [FEEDBACK]: " + ultimoResultadoBot.getMensagem());
+
+                System.out.println("\nSEU TABULEIRO DE DEFESA (Tiros Sofridos):");
+                renderizarTabuleiro(engineJogador.getGradeAtual());
+                System.out.println(">>> [SUA FROTA]: Embarcacoes restantes: " + ultimoResultadoBot.getNaviosRestantes());
+
+                turnoJogador = true; // Devolve o turno ao jogador.
+            }
+        }
+
+        // Verificacao do vencedor da partida.
+        System.out.println("\n***************************************************");
+        if (engineBot.isVitoria()) {
+            System.out.println("        VITORIA! VOCE DESTRUIU A FROTA DA IA!       ");
+        } else {
+            System.out.println("        DERROTA! A IA DESTRUIU TODA A SUA FROTA!    ");
+        }
+        System.out.println("***************************************************");
+    }
+
+    // Renderizador da grade alfanumerica formatada.
     private void renderizarTabuleiro(char[][] grade) {
-        System.out.println("\n   0 1 2 3 4 5 6 7  (Colunas)");
+        System.out.println("   0 1 2 3 4 5 6 7");
         System.out.println("  +-----------------+");
-
         for (int l = 0; l < grade.length; l++) {
-            System.out.print(l + " |"); // Indice da linha a esquerda
+            System.out.print(l + " |");
             for (int c = 0; c < grade[l].length; c++) {
                 char simbolo = grade[l][c];
-                // Se a celula for vazia, imprimimos um ponto '.' para guiar a visao do usuario.
                 if (simbolo == ' ') {
                     System.out.print(" .");
                 } else {
@@ -103,8 +166,7 @@ public class TabuleiroConsole {
         System.out.println("  +-----------------+");
     }
 
-    // Leitura defensiva: Protege a aplicacao contra entradas nao numericas ou fora dos limites.
-    // Metodologia: Tratamento de excecoes com 'try-catch' e prevencao contra travamentos.
+    // Leitura defensiva de coordenadas numericas.
     private int lerCoordenada(String prompt, int limiteMaximo) {
         int valor = -1;
         boolean entradaValida = false;
@@ -116,19 +178,19 @@ public class TabuleiroConsole {
                 if (valor >= 0 && valor < limiteMaximo) {
                     entradaValida = true;
                 } else {
-                    System.out.println("Valor invalido! Deve estar entre 0 e " + (limiteMaximo - 1) + ".");
+                    System.out.println("Valor fora dos limites! Deve estar entre 0 e " + (limiteMaximo - 1) + ".");
                 }
             } catch (InputMismatchException e) {
-                System.out.println("Entrada invalida! Por favor, digite apenas numeros inteiros.");
-                teclado.nextLine(); // Limpa o buffer de entrada do Scanner.
+                System.out.println("Entrada invalida! Digite apenas numeros inteiros.");
+                teclado.nextLine();
             }
         }
         return valor;
     }
 
-    // Pergunta se o jogador quer uma nova partida, aceitando 'S' ou 'N'.
+    // Pergunta de repeticao de partida.
     private boolean perguntarRevanche() {
-        System.out.print("\nDeseja jogar novamente? (S/N): ");
+        System.out.print("\nDeseja disputar outra partida? (S/N): ");
         String resposta = teclado.next().trim().toUpperCase();
         return resposta.startsWith("S");
     }
