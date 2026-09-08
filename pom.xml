@@ -1,0 +1,54 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <!-- Coordenadas Maven do seu projeto -->
+    <groupId>br.com.bge</groupId>
+    <artifactId>battleship-engine</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <!-- Propriedades: Centraliza as versoes das ferramentas para facil manutencao -->
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <!-- Versao estavel e compativel com Java 21 LTS -->
+        <javafx.version>21.0.2</javafx.version>
+    </properties>
+
+    <!-- Dependencias externas necessarias para a interface grafica -->
+    <dependencies>
+        <!-- Modulo de controles do JavaFX: Botoes, Labels, Grids, Caixas de Dialogo -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+    </dependencies>
+
+    <!-- Plugins de construcao e execucao do projeto -->
+    <build>
+        <plugins>
+            <!-- Plugin do Compilador Java para garantir uso das features do Java 21 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+
+            <!-- Plugin oficial do OpenJFX para rodar telas sem erros de argumentos de VM -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <!-- Classe com a janela grafica que criaremos no proximo passo -->
+                    <mainClass>br.com.bge.visao.grafica.AppGrafica</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
